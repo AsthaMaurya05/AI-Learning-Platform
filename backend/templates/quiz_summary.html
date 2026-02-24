@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Summary - AI Learning Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-brand span {
+            font-size: 24px;
+        }
+
+        .navbar-brand h2 {
+            font-size: 20px;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .navbar-menu a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .navbar-menu a:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .summary-emoji {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .summary-title {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .summary-subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-box {
+            background: #f8f9ff;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #e8eaf6;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .performance-message {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .performance-excellent {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 5px solid #4caf50;
+        }
+
+        .performance-good {
+            background: #fff3e0;
+            color: #e65100;
+            border-left: 5px solid #ff9800;
+        }
+
+        .performance-needs-work {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 5px solid #f44336;
+        }
+
+        :root {
+            --bg: #f4f6fb;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --primary: #2f4fbd;
+            --primary-600: #2643a4;
+            --border: #d8deea;
+            --shadow: 0 10px 28px rgba(17, 24, 39, 0.07);
+        }
+
+        body { background: var(--bg); color: var(--text); }
+
+        .navbar {
+            background: var(--surface);
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 2px 12px rgba(17, 24, 39, 0.04);
+        }
+
+        .navbar-menu a { color: var(--muted); border-radius: 8px; }
+        .navbar-menu a:hover { background: #eef2ff; color: var(--primary); }
+
+        .summary-card,
+        .stat-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-title,
+        .stat-value { color: var(--text); }
+        .summary-subtitle,
+        .stat-label { color: var(--muted); }
+
+        .stat-value { font-size: 30px; }
+
+        .btn {
+            border-radius: 10px;
+            transition: background .2s, color .2s, transform .2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-600);
+        }
+
+        .btn-secondary {
+            border: 1px solid #c7d2fe;
+            color: var(--primary);
+        }
+
+        .performance-excellent {
+            background: #ecfdf3;
+            color: #027a48;
+            border-left-color: #12b76a;
+        }
+
+        .performance-good {
+            background: #fffaeb;
+            color: #b54708;
+            border-left-color: #f79009;
+        }
+
+        .performance-needs-work {
+            background: #fff1f2;
+            color: #b42318;
+            border-left-color: #f04438;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <span>ALP</span>
+            <h2>AI Learning Platform</h2>
+        </div>
+        <div class="navbar-menu">
+            <a href="{% url 'dashboard' %}">Dashboard</a>
+            <a href="{% url 'practice' %}">Practice</a>
+            <a href="{% url 'weak_areas' %}">Weak Areas</a>  <!-- Add this -->
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="summary-card">
+            <div class="summary-emoji"></div>
+            <h1 class="summary-title">Quiz Complete!</h1>
+            <p class="summary-subtitle">Here's how you performed</p>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value">{{ correct_answers }}/{{ total_questions }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Accuracy</div>
+                    <div class="stat-value">{{ accuracy|floatformat:0 }}%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Time</div>
+                    <div class="stat-value">{{ total_time }}s</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg Time/Q</div>
+                    <div class="stat-value">{{ avg_time|floatformat:0 }}s</div>
+                </div>
+            </div>
+
+            {% if accuracy >= 80 %}
+            <div class="performance-message performance-excellent">
+                <strong>Excellent Work!</strong><br>
+                You have a strong understanding of the topics. Keep practicing to maintain your skills!
+            </div>
+            {% elif accuracy >= 60 %}
+            <div class="performance-message performance-good">
+                <strong>Good Job!</strong><br>
+                You're doing well, but there's room for improvement. Focus on your weak areas and keep practicing!
+            </div>
+            {% else %}
+            <div class="performance-message performance-needs-work">
+                <strong>Keep Going!</strong><br>
+                Don't be discouraged! Focus on understanding the concepts better. Practice more and you'll improve!
+            </div>
+            {% endif %}
+
+            <div class="actions">
+                <a href="{% url 'practice' %}" class="btn btn-primary">Practice Again</a>
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

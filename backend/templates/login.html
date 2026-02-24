@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - AI Learning Platform</title>
+    <style>
+        :root {
+            --bg: #f4f6fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --primary: #2f4fbd;
+            --primary-hover: #2643a4;
+            --border: #d8deea;
+            --danger-bg: #fff1f2;
+            --danger-text: #b42318;
+            --success-bg: #ecfdf3;
+            --success-text: #027a48;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+        }
+
+        .logo { text-align: center; margin-bottom: 24px; }
+        .logo h2 { color: var(--text); font-size: 24px; margin-bottom: 6px; }
+        .logo p { color: var(--muted); font-size: 14px; }
+
+        .welcome { text-align: center; margin-bottom: 24px; }
+        .welcome h3 { font-size: 20px; font-weight: 600; color: var(--text); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .form-group input {
+            width: 100%;
+            height: 44px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0 12px;
+            font-size: 14px;
+            color: var(--text);
+            background: #fff;
+        }
+
+        .form-group input:focus {
+            outline: 2px solid rgba(47, 79, 189, 0.2);
+            border-color: var(--primary);
+        }
+
+        .btn-login {
+            width: 100%;
+            height: 44px;
+            border: none;
+            border-radius: 10px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .btn-login:hover { background: var(--primary-hover); }
+
+        .register-link {
+            text-align: center;
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .register-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .register-link a:hover { text-decoration: underline; }
+
+        .error-message,
+        .success-message {
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            border: 1px solid transparent;
+        }
+
+        .error-message {
+            background: var(--danger-bg);
+            color: var(--danger-text);
+            border-color: #fecdca;
+        }
+
+        .success-message {
+            background: var(--success-bg);
+            color: var(--success-text);
+            border-color: #abefc6;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h2>AI Learning Platform</h2>
+            <p>Smart Practice for CSE Analytics</p>
+        </div>
+
+        <div class="welcome">
+            <h3>Sign in to your account</h3>
+        </div>
+
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        {% if success %}
+        <div class="success-message">{{ success }}</div>
+        {% endif %}
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="{% if message.tags == 'success' %}success-message{% else %}error-message{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next|default:'' }}">
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <button type="submit" class="btn-login">Login</button>
+        </form>
+
+        <div class="register-link">
+            New user? <a href="{% url 'register' %}">Register here</a>
+        </div>
+    </div>
+</body>
+</html>
