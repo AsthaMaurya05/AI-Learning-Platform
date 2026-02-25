@@ -267,6 +267,66 @@ Security notes:
 
 ---
 
+## Deployment Checklist
+
+Before deploying, ensure:
+
+1. Code is pushed to GitHub (`main` branch).
+2. `backend/requirements.txt` is present (included in this repo).
+3. Environment variables are set on the hosting platform:
+   - `DJANGO_SECRET_KEY`
+   - `DJANGO_DEBUG=False`
+   - `DJANGO_ALLOWED_HOSTS` (include your deployed domain)
+   - `GROQ_API_KEY`
+
+### Option A: Render (recommended)
+
+- Create a new **Web Service** from your GitHub repo.
+- Set Root Directory to `backend`.
+- Build Command:
+
+```bash
+pip install -r requirements.txt && python manage.py migrate
+```
+
+- Start Command:
+
+```bash
+gunicorn backend.wsgi:application
+```
+
+### Option B: Railway
+
+- Create a new project from GitHub repo.
+- Set service root to `backend`.
+- Use the same commands:
+  - Build: `pip install -r requirements.txt && python manage.py migrate`
+  - Start: `gunicorn backend.wsgi:application`
+- Add the same environment variables in Railway settings.
+
+### Option C: PythonAnywhere
+
+- Create a new **Manual Configuration** web app (Python 3.13 if available).
+- In Bash console:
+
+```bash
+git clone https://github.com/AsthaMaurya05/AI-Learning-Platform.git
+cd AI-Learning-Platform/backend
+pip install --user -r requirements.txt
+python manage.py migrate
+```
+
+- Configure WSGI file to point to `backend.wsgi`.
+- Add environment variables in PythonAnywhere web app settings/reload config.
+
+### Post-deploy checks
+
+- Open home page and verify login/register pages load.
+- Run one adaptive quiz to confirm AI generation works.
+- If adaptive quiz fails, verify `GROQ_API_KEY` and allowed hosts values.
+
+---
+
 ## Current Scope and Limitations
 
 - SQLite is used for development simplicity.
