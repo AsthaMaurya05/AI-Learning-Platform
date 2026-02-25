@@ -83,15 +83,12 @@ def get_topic_statistics(user):
         # Determine status
         if weakness_score < 0.3:
             status = 'Strong'
-            status_emoji = ''
             priority = 'Low'
         elif weakness_score < 0.6:
             status = 'Moderate'
-            status_emoji = ''
             priority = 'Medium'
         else:
             status = 'Weak'
-            status_emoji = ''
             priority = 'High'
         
         topic_analysis.append({
@@ -103,7 +100,6 @@ def get_topic_statistics(user):
             'consistency': round(consistency, 1),
             'weakness_score': weakness_score,
             'status': status,
-            'status_emoji': status_emoji,
             'priority': priority
         })
     

@@ -16,6 +16,17 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
+def _get_groq_models():
+    configured = (getattr(settings, 'GROQ_MODEL', '') or '').strip()
+    default_models = [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+    ]
+    if configured:
+        return [configured, *[m for m in default_models if m != configured]]
+    return default_models
+
+
 def _get_groq_client():
     if Groq is None:
         return None
@@ -106,7 +117,7 @@ def _parse_questions_response(response_text):
     raise json.JSONDecodeError('Unable to parse AI response as JSON array', cleaned, 0)
 
 
-def generate_questions(topic, difficulty='Easy', num_questions=5):
+def generate_questions(topic, difficulty='Easy', num_questions=5, allow_fallback=True):
     """
     Generate quiz questions using Groq AI
     
@@ -121,8 +132,13 @@ def generate_questions(topic, difficulty='Easy', num_questions=5):
     
     client = _get_groq_client()
     if client is None:
-        logger.warning("Groq client unavailable. Falling back to static questions.")
-        return _get_static_fallback_questions(topic, difficulty, num_questions)
+        message = (
+            "Groq client unavailable. Ensure GROQ_API_KEY is set and groq package is installed."
+        )
+        if allow_fallback:
+            logger.warning("%s Falling back to static questions.", message)
+            return _get_static_fallback_questions(topic, difficulty, num_questions)
+        raise RuntimeError(message)
 
     prompt = f"""Generate {num_questions} multiple-choice questions for a CSE analytics test.
 
@@ -148,88 +164,96 @@ Return ONLY a valid JSON array in this exact format (no markdown, no extra text)
     last_error = None
     last_response_text = ""
 
-    for attempt in range(1, 4):
-        try:
-            if attempt > 1:
-                logger.info("Retrying AI generation (attempt %s/3)", attempt)
+    model_candidates = _get_groq_models()
 
-            # Call Groq API
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert question generator for analytical aptitude tests. "
-                            "Respond with valid JSON array only. No markdown, no commentary, "
-                            "no trailing commas, and keep all strings properly escaped."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7 if attempt == 1 else 0.2,
-                max_tokens=2600,
-            )
+    for model_name in model_candidates:
+        for attempt in range(1, 3):
+            try:
+                if attempt > 1:
+                    logger.info(
+                        "Retrying AI generation with model %s (attempt %s/2)",
+                        model_name,
+                        attempt,
+                    )
 
-            response_text = (response.choices[0].message.content or "").strip()
-            last_response_text = response_text
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are an expert question generator for analytical aptitude tests. "
+                                "Respond with valid JSON array only. No markdown, no commentary, "
+                                "no trailing commas, and keep all strings properly escaped."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.7 if attempt == 1 else 0.2,
+                    max_tokens=2600,
+                )
 
-            questions = _parse_questions_response(response_text)
+                response_text = (response.choices[0].message.content or "").strip()
+                last_response_text = response_text
 
-            # Validate and format
-            formatted_questions = []
-            for i, q in enumerate(questions[:num_questions]):
-                if not all(key in q for key in ['question', 'options', 'correct_answer', 'explanation']):
-                    logger.warning("Skipping invalid question payload")
-                    continue
+                questions = _parse_questions_response(response_text)
 
-                options = q.get('options', [])
-                correct_answer = q.get('correct_answer')
+                formatted_questions = []
+                for i, q in enumerate(questions[:num_questions]):
+                    if not all(key in q for key in ['question', 'options', 'correct_answer', 'explanation']):
+                        logger.warning("Skipping invalid question payload")
+                        continue
 
-                if not isinstance(options, list) or len(options) != 4:
-                    logger.warning("Skipping question with invalid options")
-                    continue
+                    options = q.get('options', [])
+                    correct_answer = q.get('correct_answer')
 
-                if not isinstance(correct_answer, int) or correct_answer not in [0, 1, 2, 3]:
-                    logger.warning("Skipping question with invalid correct_answer")
-                    continue
+                    if not isinstance(options, list) or len(options) != 4:
+                        logger.warning("Skipping question with invalid options")
+                        continue
 
-                formatted_questions.append({
-                    'id': f'ai_{topic}_{i+1}',
-                    'topic': topic,
-                    'difficulty': difficulty,
-                    'question': q['question'],
-                    'options': options,
-                    'correct_answer': correct_answer,
-                    'explanation': q['explanation'],
-                    'source': 'Groq AI'
-                })
+                    if not isinstance(correct_answer, int) or correct_answer not in [0, 1, 2, 3]:
+                        logger.warning("Skipping question with invalid correct_answer")
+                        continue
 
-            if formatted_questions:
-                logger.info("Successfully generated %s questions using Groq", len(formatted_questions))
-                return formatted_questions
+                    formatted_questions.append({
+                        'id': f'ai_{topic}_{i+1}',
+                        'topic': topic,
+                        'difficulty': difficulty,
+                        'question': q['question'],
+                        'options': options,
+                        'correct_answer': correct_answer,
+                        'explanation': q['explanation'],
+                        'source': f'Groq AI ({model_name})'
+                    })
 
-            last_error = ValueError("AI returned no valid question objects")
+                if formatted_questions:
+                    logger.info("Successfully generated %s questions using Groq model %s", len(formatted_questions), model_name)
+                    return formatted_questions
 
-        except json.JSONDecodeError as e:
-            last_error = e
-            logger.warning("JSON parse error during AI generation (attempt %s/3): %s", attempt, e)
-        except Exception as e:
-            last_error = e
-            logger.warning("Groq API error during generation (attempt %s/3): %s", attempt, e)
+                last_error = ValueError(f"AI returned no valid question objects for model {model_name}")
+
+            except json.JSONDecodeError as e:
+                last_error = e
+                logger.warning("JSON parse error during AI generation (model=%s attempt=%s/2): %s", model_name, attempt, e)
+            except Exception as e:
+                last_error = e
+                logger.warning("Groq API error during generation (model=%s attempt=%s/2): %s", model_name, attempt, e)
 
     if isinstance(last_error, json.JSONDecodeError):
         logger.warning("AI response sample after parse failure: %s", (last_response_text or '')[:250])
     else:
         logger.error("Final AI generation failure: %s", last_error)
 
-    return _get_static_fallback_questions(topic, difficulty, num_questions)
+    if allow_fallback:
+        return _get_static_fallback_questions(topic, difficulty, num_questions)
+
+    raise RuntimeError(f"AI generation failed: {last_error or 'unknown error'}")
 
 
-def generate_adaptive_questions(user, num_questions=5):
+def generate_adaptive_questions(user, num_questions=5, allow_fallback=True):
     """
     Generate questions based on user's weak areas
     
@@ -247,7 +271,7 @@ def generate_adaptive_questions(user, num_questions=5):
     
     if not topic_stats:
         # Default topics if no data
-        return generate_questions('Logical Reasoning', 'Easy', num_questions)
+        return generate_questions('Logical Reasoning', 'Easy', num_questions, allow_fallback=allow_fallback)
     
     # Sort by weakness score (highest first)
     weak_topics = [t for t in topic_stats if t['status'] in ['Weak', 'Moderate']]
@@ -255,7 +279,7 @@ def generate_adaptive_questions(user, num_questions=5):
     if not weak_topics:
         # User is strong in all areas, give medium difficulty
         topic = topic_stats[0]['topic']
-        return generate_questions(topic, 'Medium', num_questions)
+        return generate_questions(topic, 'Medium', num_questions, allow_fallback=allow_fallback)
     
     # Focus on weakest topic
     weakest_topic = weak_topics[0]
@@ -272,4 +296,4 @@ def generate_adaptive_questions(user, num_questions=5):
     
     logger.info("Generating %s %s questions for %s", num_questions, difficulty, topic_name)
     
-    return generate_questions(topic_name, difficulty, num_questions)
+    return generate_questions(topic_name, difficulty, num_questions, allow_fallback=allow_fallback)

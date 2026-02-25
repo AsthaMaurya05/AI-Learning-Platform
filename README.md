@@ -3,7 +3,7 @@
 AI Learning Platform is a Django web application for aptitude practice and personalized learning.
 It combines:
 
-- user authentication with email OTP verification,
+- user authentication,
 - static quiz practice,
 - adaptive AI-generated quizzes,
 - weak-area analytics,
@@ -15,18 +15,14 @@ The project is designed as a monolithic Django app for easy local development an
 
 ## Core Features
 
-### 1) Authentication + Email OTP Verification
+### 1) Authentication
 
 - Users register with username, email, and password.
-- New accounts are created as inactive (`is_active=False`).
-- A 6-digit OTP is generated, stored in session (10-minute expiry), and sent via email backend.
-- User verifies OTP to activate account.
-- If an unverified user tries to log in, OTP flow is triggered again.
+- Accounts are created as active and can log in immediately.
 
 Security checks included:
 
 - password validation with Django validators,
-- OTP attempt counting (lock after too many tries),
 - safe redirect handling for `next` URL.
 
 ### 2) Static Quiz Practice (Question Bank)
@@ -93,15 +89,14 @@ The dashboard uses stored attempts/sessions to show:
 ### User Journey
 
 1. Register account
-2. Verify email OTP
-3. Login
-4. Open dashboard
-5. Click Practice
+2. Login
+3. Open dashboard
+4. Click Practice
    - first-time user → static quiz
    - returning user → recommendation page
-6. Attempt quiz (static or adaptive)
-7. View summary and updated analytics
-8. Open weak-areas/recommendations for next targeted practice
+5. Attempt quiz (static or adaptive)
+6. View summary and updated analytics
+7. Open weak-areas/recommendations for next targeted practice
 
 ### Practice Routing Logic
 
@@ -185,8 +180,6 @@ Use cases:
 - `/` → redirects to login
 - `/login/` → login
 - `/register/` → registration
-- `/verify-email-otp/` → OTP verification
-- `/resend-email-otp/` → resend OTP
 - `/dashboard/` → dashboard analytics
 - `/practice/` → intelligent practice entry
 - `/quiz/` → static quiz flow
@@ -247,18 +240,30 @@ The project reads configuration from environment variables:
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `GROQ_API_KEY`
-- `DEFAULT_FROM_EMAIL`
-- `EMAIL_BACKEND`
-- `EMAIL_HOST`
-- `EMAIL_PORT`
-- `EMAIL_HOST_USER`
-- `EMAIL_HOST_PASSWORD`
-- `EMAIL_USE_TLS`
+
+### Local `.env` Setup
+
+1. Copy `backend/.env.example` to `backend/.env`.
+2. Add your real values (especially `GROQ_API_KEY`).
+3. Restart the Django server after changes.
+
+Example:
+
+```env
+DJANGO_SECRET_KEY=django-insecure-change-me
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+GROQ_API_KEY=your_real_groq_api_key
+```
+
+Security notes:
+
+- `backend/.env` contains secrets and is gitignored.
+- `backend/.env.example` is safe to commit and share as a template.
 
 ### Notes
 
 - If `GROQ_API_KEY` is missing, AI generation gracefully falls back to static questions.
-- Default email backend is console backend for local development.
 
 ---
 

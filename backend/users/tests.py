@@ -1,11 +1,8 @@
 from django.test import TestCase
-from django.test import override_settings
 from django.urls import reverse
 from django.contrib.auth.models import User
-from django.core import mail
 
 
-@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class AuthenticationFlowTests(TestCase):
 	def setUp(self):
 		self.password = 'StrongPass123!'
@@ -25,20 +22,19 @@ class AuthenticationFlowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertFalse(User.objects.filter(username='newuser').exists())
 
-	def test_register_sends_otp_and_creates_inactive_user(self):
+	def test_register_creates_active_user_and_redirects_login(self):
 		response = self.client.post(reverse('register'), {
 			'username': 'otpuser',
 			'email': 'otp@example.com',
 			'password': 'StrongPass123!',
 			'password2': 'StrongPass123!',
 		})
-		self.assertRedirects(response, reverse('verify_email_otp'))
+		self.assertRedirects(response, reverse('login'))
 
 		created_user = User.objects.get(username='otpuser')
-		self.assertFalse(created_user.is_active)
-		self.assertEqual(len(mail.outbox), 1)
+		self.assertTrue(created_user.is_active)
 
-	def test_verify_correct_otp_activates_user(self):
+	def test_login_works_immediately_after_registration(self):
 		self.client.post(reverse('register'), {
 			'username': 'verifyotp',
 			'email': 'verifyotp@example.com',
@@ -46,29 +42,14 @@ class AuthenticationFlowTests(TestCase):
 			'password2': 'StrongPass123!',
 		})
 
-		session = self.client.session
-		otp = session['registration_otp']['otp']
-
-		response = self.client.post(reverse('verify_email_otp'), {'otp': otp})
-		self.assertRedirects(response, reverse('login'))
+		response = self.client.post(reverse('login'), {
+			'username': 'verifyotp',
+			'password': 'StrongPass123!',
+		})
+		self.assertRedirects(response, reverse('dashboard'))
 
 		verified_user = User.objects.get(username='verifyotp')
 		self.assertTrue(verified_user.is_active)
-
-	def test_verify_wrong_otp_keeps_user_inactive(self):
-		self.client.post(reverse('register'), {
-			'username': 'wrongotp',
-			'email': 'wrongotp@example.com',
-			'password': 'StrongPass123!',
-			'password2': 'StrongPass123!',
-		})
-
-		response = self.client.post(reverse('verify_email_otp'), {'otp': '000000'})
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Invalid OTP')
-
-		pending_user = User.objects.get(username='wrongotp')
-		self.assertFalse(pending_user.is_active)
 
 	def test_login_with_safe_next_redirects_to_internal_path(self):
 		response = self.client.post(

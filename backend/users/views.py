@@ -1,53 +1,18 @@
 from django.shortcuts import render, redirect
-from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.contrib import messages
-from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
-from datetime import timedelta
 import random
-from .questions import get_all_questions, get_question_by_id
+import json
+from .questions import get_all_questions
 from .models import PracticeActivity, QuizSession
-
-
-REGISTRATION_OTP_SESSION_KEY = 'registration_otp'
-
-
-def _clear_registration_otp(request):
-    request.session.pop(REGISTRATION_OTP_SESSION_KEY, None)
-    request.session.modified = True
-
-
-def _store_and_send_registration_otp(request, user):
-    otp = f"{random.randint(0, 999999):06d}"
-    request.session[REGISTRATION_OTP_SESSION_KEY] = {
-        'user_id': user.id,
-        'otp': otp,
-        'expires_at': (timezone.now() + timedelta(minutes=10)).isoformat(),
-        'attempts': 0,
-    }
-    request.session.modified = True
-
-    send_mail(
-        subject='Your OTP for AI Learning Platform',
-        message=(
-            f'Hi {user.username},\n\n'
-            f'Your OTP is: {otp}\n'
-            'This OTP is valid for 10 minutes.\n\n'
-            'If you did not request this, you can ignore this email.'
-        ),
-        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@example.com'),
-        recipient_list=[user.email],
-        fail_silently=False,
-    )
+from .analytics import get_topic_statistics, generate_recommendations
 
 def home(request):
     """Redirect root route to login flow"""
@@ -90,24 +55,12 @@ def login_page(request):
             # Login successful
             login(request, user)
             return redirect(get_safe_redirect_url())
-        else:
-            existing_user = User.objects.filter(username__iexact=username).first()
-            if existing_user and not existing_user.is_active and existing_user.check_password(password):
-                try:
-                    _store_and_send_registration_otp(request, existing_user)
-                    messages.info(request, 'Account not verified. OTP sent to your email.')
-                    return redirect('verify_email_otp')
-                except Exception:
-                    return render(request, 'login.html', {
-                        'error': 'Account is not verified and OTP could not be sent. Please try again.',
-                        'next': next_url,
-                    })
 
-            # Login failed
-            return render(request, 'login.html', {
-                'error': 'Invalid username or password',
-                'next': next_url,
-            })
+        # Login failed
+        return render(request, 'login.html', {
+            'error': 'Invalid username or password',
+            'next': next_url,
+        })
     
     # If GET request, just show the login page
     return render(request, 'login.html', {'next': next_url})
@@ -157,109 +110,18 @@ def register_page(request):
                 'error': ' '.join(exc.messages)
             })
         
-        # Create new user as inactive until OTP verification
-        user = User.objects.create_user(
+        User.objects.create_user(
             username=username,
             email=email,
             password=password,
-            is_active=False,
+            is_active=True,
         )
 
-        try:
-            _store_and_send_registration_otp(request, user)
-        except Exception:
-            user.delete()
-            return render(request, 'register.html', {
-                'error': 'Could not send OTP email. Please try again.',
-            })
-
-        messages.success(request, 'Account created. OTP sent to your email. Please verify to continue.')
-        return redirect('verify_email_otp')
+        messages.success(request, 'Account created successfully. Please log in.')
+        return redirect('login')
     
     # If GET request, show registration page
     return render(request, 'register.html')
-
-
-@require_http_methods(["GET", "POST"])
-def verify_email_otp(request):
-    otp_data = request.session.get(REGISTRATION_OTP_SESSION_KEY)
-
-    if not otp_data:
-        messages.error(request, 'No OTP session found. Please register again.')
-        return redirect('register')
-
-    try:
-        user = User.objects.get(pk=otp_data.get('user_id'))
-    except User.DoesNotExist:
-        _clear_registration_otp(request)
-        messages.error(request, 'Verification session expired. Please register again.')
-        return redirect('register')
-
-    if request.method == 'POST':
-        entered_otp = (request.POST.get('otp') or '').strip()
-        expires_at = parse_datetime(otp_data.get('expires_at', ''))
-
-        if not expires_at or timezone.now() > expires_at:
-            return render(request, 'verify_otp.html', {
-                'email': user.email,
-                'error': 'OTP expired. Please request a new OTP.',
-            })
-
-        attempts = int(otp_data.get('attempts', 0)) + 1
-        otp_data['attempts'] = attempts
-        request.session[REGISTRATION_OTP_SESSION_KEY] = otp_data
-        request.session.modified = True
-
-        if attempts > 5:
-            return render(request, 'verify_otp.html', {
-                'email': user.email,
-                'error': 'Too many attempts. Please request a new OTP.',
-            })
-
-        if entered_otp == otp_data.get('otp'):
-            user.is_active = True
-            user.save(update_fields=['is_active'])
-            _clear_registration_otp(request)
-            messages.success(request, 'Email verified successfully! Please log in.')
-            return redirect('login')
-
-        return render(request, 'verify_otp.html', {
-            'email': user.email,
-            'error': 'Invalid OTP. Please try again.',
-        })
-
-    return render(request, 'verify_otp.html', {
-        'email': user.email,
-    })
-
-
-@require_POST
-def resend_email_otp(request):
-    otp_data = request.session.get(REGISTRATION_OTP_SESSION_KEY)
-    if not otp_data:
-        messages.error(request, 'No verification session found. Please register again.')
-        return redirect('register')
-
-    try:
-        user = User.objects.get(pk=otp_data.get('user_id'))
-    except User.DoesNotExist:
-        _clear_registration_otp(request)
-        messages.error(request, 'Verification session expired. Please register again.')
-        return redirect('register')
-
-    if user.is_active:
-        _clear_registration_otp(request)
-        messages.success(request, 'Account already verified. Please log in.')
-        return redirect('login')
-
-    try:
-        _store_and_send_registration_otp(request, user)
-    except Exception:
-        messages.error(request, 'Could not resend OTP right now. Please try again.')
-        return redirect('verify_email_otp')
-
-    messages.success(request, 'New OTP sent to your email.')
-    return redirect('verify_email_otp')
 
 
 @login_required(login_url='login')
@@ -333,8 +195,6 @@ def dashboard(request):
         session_accuracies = []
         recent_sessions = []
     
-    import json
-    
     context = {
         'total_attempted': total_attempted,
         'accuracy': round(accuracy, 1),
@@ -374,16 +234,12 @@ def quiz(request):
     
     # Initialize session variables if starting new quiz
     if 'quiz_started' not in request.session or request.GET.get('new'):
-        print("Starting new regular quiz session")  # DEBUG
         request.session['quiz_started'] = True
         request.session['current_question'] = 1
         request.session['correct_answers'] = 0
         request.session['answers'] = []
         
         # SHUFFLE questions for this session
-        from .questions import get_all_questions
-        import random
-        
         all_questions = get_all_questions()
         shuffled = all_questions.copy()
         random.shuffle(shuffled)
@@ -391,7 +247,6 @@ def quiz(request):
         # Store shuffled questions in session
         request.session['session_questions'] = shuffled
         request.session.modified = True
-        print(f"Shuffled {len(shuffled)} questions for this session")  # DEBUG
     
     # Get current question number
     current_q_num = request.session.get('current_question', 1)
@@ -400,7 +255,6 @@ def quiz(request):
     all_questions = request.session.get('session_questions')
     if not all_questions:
         # Fallback if session lost
-        from .questions import get_all_questions
         all_questions = get_all_questions()
     
     total_questions = len(all_questions)
@@ -515,8 +369,6 @@ def quiz_summary(request):
     return render(request, 'quiz_summary.html', context)
 
 
-from .analytics import get_topic_statistics, generate_recommendations
-
 @login_required(login_url='login')
 def weak_areas(request):
     """Display weak area analysis with ML-based insights"""
@@ -530,12 +382,6 @@ def weak_areas(request):
     }
     
     return render(request, 'weak_areas.html', context)
-
-
-
-
-from .ai_generator import generate_adaptive_questions
-from .analytics import get_topic_statistics, generate_recommendations
 
 @login_required(login_url='login')
 def recommendations_page(request):
@@ -563,10 +409,6 @@ def adaptive_quiz(request):
     force_new = request.GET.get('new') or request.GET.get('topic')
     
     if 'adaptive_quiz_started' not in request.session or force_new:
-        print("\n" + "=" * 70)
-        print("STARTING FRESH ADAPTIVE QUIZ SESSION")
-        print("=" * 70)
-        
         # Clear ALL adaptive quiz session data
         request.session.pop('adaptive_quiz_started', None)
         request.session.pop('adaptive_current_question', None)
@@ -580,37 +422,25 @@ def adaptive_quiz(request):
         request.session['adaptive_correct'] = 0
         request.session['adaptive_answers'] = []
         request.session.modified = True
-        
-        print("Session cleared and reset")
     
     # ALWAYS generate fresh questions if we don't have any OR if topic changed
     current_questions = request.session.get('adaptive_questions')
     if not current_questions or force_new:
-        print("\nGenerating new AI questions...")
-        print(f"Topic requested: {topic_param if topic_param else 'Auto (weak areas)'}")
-        
         questions = None
         error_message = None
         
         try:
             if topic_param:
                 # Generate for specific topic
-                print(f"Mode: Specific Topic - '{topic_param}'")
                 from .ai_generator import generate_questions
-                questions = generate_questions(topic_param, 'Easy', 5)
+                questions = generate_questions(topic_param, 'Easy', 5, allow_fallback=False)
             else:
                 # Generate based on weak areas
-                print("Mode: Adaptive (analyzing weak areas)")
                 from .ai_generator import generate_adaptive_questions
-                questions = generate_adaptive_questions(request.user, 5)
+                questions = generate_adaptive_questions(request.user, 5, allow_fallback=False)
             
             # Validate questions
             if questions and len(questions) > 0:
-                print("AI generation success")
-                print(f"   - Generated: {len(questions)} questions")
-                print(f"   - Source: {questions[0].get('source', 'Unknown')}")
-                print(f"   - First topic: {questions[0].get('topic', 'Unknown')}")
-                
                 # Store in session
                 request.session['adaptive_questions'] = questions
                 request.session['adaptive_current_question'] = 0  # Reset to first question
@@ -618,64 +448,50 @@ def adaptive_quiz(request):
                 
             else:
                 error_message = "AI returned empty question list"
-                print(f"Error: {error_message}")
         
         except Exception as e:
             error_message = str(e)
-            print(f"AI generation error: {error_message}")
-            import traceback
-            traceback.print_exc()
         
         # If AI failed, show error page
         if not questions or len(questions) == 0:
-            print("\nStopping - Cannot proceed without AI questions")
             return render(request, 'quiz_error.html', {
-                'error': f'Failed to generate AI questions. Error: {error_message or "Unknown error"}. Please check terminal logs.'
+                'error': (
+                    f'Failed to generate AI questions. Error: {error_message or "Unknown error"}. '
+                    'Please configure a valid GROQ_API_KEY and retry.'
+                )
             })
     
     # Get questions from session
     questions = request.session.get('adaptive_questions')
     current_index = request.session.get('adaptive_current_question', 0)
     
-    print(f"\nDisplaying: Question {current_index + 1}/{len(questions)}")
-    
     # Check if quiz is complete
     if current_index >= len(questions):
-        print("Quiz complete. Redirecting to summary...\n")
         return redirect('adaptive_quiz_summary')
     
     current_question = questions[current_index]
-    print(f"   Source: {current_question.get('source', 'Unknown')}")
-    print(f"   Topic: {current_question.get('topic', 'Unknown')}")
-    print(f"   ID: {current_question.get('id', 'Unknown')}")
     
     # Handle answer submission
     submitted = False
     is_correct = False
     
     if request.method == 'POST':
-        print("\nProcessing answer submission...")
         selected_option = int(request.POST.get('selected_option'))
         time_taken = int(request.POST.get('time_taken', 0))
         
         is_correct = selected_option == current_question['correct_answer']
-        print(f"   Answer: {'Correct' if is_correct else 'Wrong'}")
         
         # Save to database
-        try:
-            PracticeActivity.objects.create(
-                user=request.user,
-                question_id=abs(hash(str(current_question.get('id', f'ai_{current_index}')))),
-                topic=current_question['topic'],
-                difficulty=current_question.get('difficulty', 'Easy'),
-                selected_option=selected_option,
-                correct_answer=current_question['correct_answer'],
-                is_correct=is_correct,
-                time_taken=time_taken
-            )
-            print("   Saved to database")
-        except Exception as e:
-            print(f"   Database error: {e}")
+        PracticeActivity.objects.create(
+            user=request.user,
+            question_id=abs(hash(str(current_question.get('id', f'ai_{current_index}')))),
+            topic=current_question['topic'],
+            difficulty=current_question.get('difficulty', 'Easy'),
+            selected_option=selected_option,
+            correct_answer=current_question['correct_answer'],
+            is_correct=is_correct,
+            time_taken=time_taken
+        )
         
         # Update session
         if is_correct:
@@ -685,7 +501,6 @@ def adaptive_quiz(request):
         request.session.modified = True
         
         submitted = True
-        print("   Session updated\n")
     
     context = {
         'question': current_question,
@@ -721,7 +536,7 @@ def adaptive_quiz_summary(request):
         'correct_answers': correct,
         'total_questions': total,
         'accuracy': accuracy,
-        'total_time': 0,  # Can add timer later
+        'total_time': 0,
         'avg_time': 0,
         'is_adaptive': True,
     }
