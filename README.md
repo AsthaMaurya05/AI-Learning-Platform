@@ -281,6 +281,18 @@ Before deploying, ensure:
 
 ### Option A: Render (recommended)
 
+- Quick setup values:
+  - Service type: **Web Service**
+  - Root Directory: `backend`
+  - Build Command: `pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput`
+  - Start Command: use `Procfile` (`web: gunicorn backend.wsgi`) or set `gunicorn backend.wsgi:application`
+  - Auto-Deploy: enabled on push to `main`
+  - Required env vars:
+    - `DJANGO_SECRET_KEY` (required, no fallback)
+    - `DJANGO_DEBUG=False`
+    - `DJANGO_ALLOWED_HOSTS=<your-app-name>.onrender.com`
+    - `GROQ_API_KEY=<your_key>`
+
 - Create a new **Web Service** from your GitHub repo.
 - Set Root Directory to `backend`.
 - Build Command:
