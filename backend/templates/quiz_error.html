@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - AI Learning Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .error-container {
+            background: white;
+            padding: 60px 40px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .error-title {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+
+        .error-message {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .error-details {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .error-details strong {
+            color: #c62828;
+        }
+
+        .error-details p {
+            color: #555;
+            margin-top: 10px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        :root {
+            --bg: #f4f6fb;
+            --surface: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --primary: #2f4fbd;
+            --primary-600: #2643a4;
+            --border: #d8deea;
+            --danger-bg: #fff1f2;
+            --danger-border: #fecdca;
+            --danger-text: #b42318;
+            --shadow: 0 10px 28px rgba(17, 24, 39, 0.07);
+        }
+
+        body { background: var(--bg); color: var(--text); }
+
+        .error-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            border-radius: 14px;
+        }
+
+        .error-title { color: var(--text); }
+        .error-message { color: var(--muted); }
+
+        .error-details {
+            background: var(--danger-bg);
+            border-left-color: #f04438;
+            border: 1px solid var(--danger-border);
+            border-radius: 10px;
+        }
+
+        .error-details strong { color: var(--danger-text); }
+
+        .btn {
+            background: var(--primary);
+            border-radius: 10px;
+            border: 1px solid var(--primary);
+        }
+
+        .btn:hover { background: var(--primary-600); transform: none; }
+
+        .btn-secondary {
+            background: #fff;
+            color: var(--primary);
+            border: 1px solid #c7d2fe;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">Error</div>
+        <h1 class="error-title">Oops! Something Went Wrong</h1>
+        <p class="error-message">
+            We encountered an issue while generating your quiz questions.
+        </p>
+        
+        {% if error %}
+        <div class="error-details">
+            <strong>Error Details:</strong>
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <div>
+            <a href="{% url 'quiz' %}" class="btn">Try Regular Quiz</a>
+            <a href="{% url 'recommendations' %}" class="btn btn-secondary">Back to Recommendations</a>
+        </div>
+    </div>
+</body>
+</html>
